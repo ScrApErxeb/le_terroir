@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Le terroir enchanteur</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Le terroir enchanteur</h1>
+    <p>Clients, boissons, factures, paiements, dépenses et soldes journaliers.</p>
+    <nav id="main-nav">
+      <button type="button" data-page="home">Accueil</button>
+      <button type="button" data-page="sales">Vente</button>
+      <button type="button" data-page="management">Gestion</button>
+      <button type="button" data-page="accounting">Compta</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="home-page" class="page panel">
+      <h2>Bienvenue</h2>
+      <p>Utilisez les onglets pour gérer les ventes, les clients, les produits et la comptabilité.</p>
+      <div class="home-actions">
+        <button type="button" data-page="sales">Nouvelle vente</button>
+        <button type="button" data-page="management">Clients et produits</button>
+        <button type="button" data-page="accounting">Comptabilité</button>
+      </div>
+    </section>
+
+    <section id="sales-page" class="page panel hidden">
+      <h2>Vente</h2>
+      
+      <div class="split-panel-sales">
+        <div class="panel-left">
+          <h3>Enregistrer une vente</h3>
+          <form id="invoice-form">
+            <select id="server-select" name="served_by"></select>
+            <select name="client_id" id="invoice-client"></select>
+            <input type="hidden" name="date" id="invoice-date" />
+            <input type="hidden" name="sold_by" id="sold-by" />
+            <div id="invoice-lines"></div>
+            <input type="text" id="invoice-total" placeholder="Total" readonly />
+            <button type="button" id="add-line">Ajouter ligne</button>
+            <button type="submit">Enregistrer la facture</button>
+            <datalist id="product-list"></datalist>
+          </form>
+        </div>
+
+        <div class="panel-right">
+          <h3>Paiements</h3>
+          <form id="payment-form">
+            <select name="invoice_id" id="payment-invoice" required></select>
+            <input name="date" id="payment-date" type="date" required />
+            <input name="amount" id="payment-amount" placeholder="Montant" type="number" step="0.01" required />
+            <input name="method" id="payment-method" placeholder="Méthode" />
+            <button type="submit">Enregistrer paiement</button>
+          </form>
+        </div>
+      </div>
+
+      <section class="panel" id="last-invoice-section" style="display: none;">
+        <h3>Dernière facture enregistrée</h3>
+        <div id="last-invoice-details"></div>
+        <button type="button" id="print-invoice-btn">Imprimer la facture</button>
+      </section>
+
+      <section class="panel">
+        <h3>Factures enregistrées</h3>
+        <label>Choisir une facture :
+          <select id="invoice-select" name="selected_invoice"><option value="">Sélectionner une facture</option></select>
+        </label>
+        <div id="invoice-details"></div>
+      </section>
+
+      <section class="panel">
+        <h3>Liste des factures</h3>
+        <div class="filter-buttons">
+          <button type="button" class="filter-btn active" data-filter="all">Toutes</button>
+          <button type="button" class="filter-btn" data-filter="paid">Payées</button>
+          <button type="button" class="filter-btn" data-filter="unpaid">Impayées</button>
+        </div>
+        <div id="invoice-list-container"></div>
+        <div id="invoice-pagination" class="pagination-controls"></div>
+      </section>
+    </section>
+
+    <section id="management-page" class="page panel hidden">
+      <h2>Gestion</h2>
+      <div class="split-panel">
+        <div class="panel">
+          <h3>Clients</h3>
+          <form id="client-form">
+            <input name="name" placeholder="Nom du client" required />
+            <input name="phone" placeholder="Téléphone" />
+            <input name="email" placeholder="Email" type="email" />
+            <input name="notes" placeholder="Notes" />
+            <button type="submit">Ajouter client</button>
+          </form>
+          <div id="clients-list"></div>
+        </div>
+
+        <div class="panel">
+          <h3>Boissons / Produits</h3>
+          <form id="product-form">
+            <input name="name" placeholder="Nom du produit" required />
+            <input name="category" placeholder="Catégorie" />
+            <input name="purchase_price" placeholder="Prix d'achat" type="number" step="0.01" required />
+            <input name="sell_price" placeholder="Prix de vente" type="number" step="0.01" required />
+            <input name="stock" placeholder="Stock initial" type="number" min="0" required />
+            <button type="submit">Ajouter produit</button>
+          </form>
+          <div id="products-list"></div>
+        </div>
+      </div>
+      <section class="panel">
+        <h3>Équipe</h3>
+        <form id="staff-form">
+          <input name="name" placeholder="Nom du membre" required />
+          <select name="role" required>
+            <option value="vendeur">Vendeur</option>
+            <option value="serveur">Serveuse</option>
+          </select>
+          <button type="submit">Ajouter membre</button>
+        </form>
+        <div id="staff-list"></div>
+      </section>
+    </section>
+
+    <section id="accounting-page" class="page panel hidden">
+      <h2>Compta</h2>
+      <div class="split-panel">
+        <div class="panel">
+          <h3>Dépenses</h3>
+          <form id="expense-form">
+            <input name="description" placeholder="Description" required />
+            <input name="amount" placeholder="Montant" type="number" step="0.01" required />
+            <input name="date" type="date" required />
+            <input name="category" placeholder="Catégorie" />
+            <button type="submit">Enregistrer dépense</button>
+          </form>
+        </div>
+
+        <div class="panel">
+          <h3>Entrées comptables</h3>
+          <form id="revenue-form">
+            <input name="description" placeholder="Description" required />
+            <input name="amount" placeholder="Montant" type="number" step="0.01" required />
+            <input name="date" type="date" required />
+            <input name="category" placeholder="Catégorie" />
+            <button type="submit">Enregistrer entrée</button>
+          </form>
+        </div>
+      </div>
+
+      <section class="panel">
+        <h3>Solde par jour</h3>
+        <form id="summary-form">
+          <input name="date" type="date" required />
+          <button type="submit">Voir le résumé</button>
+        </form>
+        <div id="summary-result"></div>
+      </section>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

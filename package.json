@@ -1,0 +1,14 @@
+{
+  "name": "cave-app",
+  "version": "1.0.0",
+  "description": "Application de gestion de cave, facturation, paiements, comptabilité.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.4",
+    "sqlite3": "^5.1.6",
+    "sqlite": "^4.1.1"
+  }
+}
