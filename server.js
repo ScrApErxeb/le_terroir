@@ -6,9 +6,12 @@ const crypto = require('crypto');
 
 const app = express();
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+const IS_PACKAGED = Boolean(process.pkg);
+const APP_ROOT = IS_PACKAGED ? path.dirname(process.execPath) : __dirname;
+const PUBLIC_DIR = IS_PACKAGED ? path.join(__dirname, 'public') : path.join(__dirname, 'public');
+app.use(express.static(PUBLIC_DIR));
 
-const DB_FILE = path.join(__dirname, 'data.db');
+const DB_FILE = path.join(APP_ROOT, 'data.db');
 let db;
 const sessions = new Map();
 
@@ -690,7 +693,7 @@ app.get('/api/summary', async (req, res) => {
 });
 
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
 });
 
 initDb()
