@@ -1,5 +1,52 @@
+const AUTH_TOKEN_KEY = 'lte_auth_token';
+let appBootstrapped = false;
+
+function getAuthToken() {
+  return localStorage.getItem(AUTH_TOKEN_KEY) || '';
+}
+
+function setAuthToken(token) {
+  if (!token) {
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    return;
+  }
+  localStorage.setItem(AUTH_TOKEN_KEY, token);
+}
+
+function setAuthUi(isAuthenticated) {
+  const loginScreen = document.getElementById('login-screen');
+  const main = document.querySelector('main');
+  const nav = document.getElementById('main-nav');
+  const logoutBtn = document.getElementById('logout-btn');
+  if (loginScreen) loginScreen.classList.toggle('hidden', isAuthenticated);
+  if (main) main.classList.toggle('hidden', !isAuthenticated);
+  if (nav) nav.classList.toggle('hidden', !isAuthenticated);
+  if (logoutBtn) logoutBtn.classList.toggle('hidden', !isAuthenticated);
+}
+
+function setLoginFeedback(message, isError = false) {
+  const node = document.getElementById('login-feedback');
+  if (!node) return;
+  node.textContent = message || '';
+  node.className = isError ? 'error-text' : 'success-text';
+}
+
+function setBootstrapFeedback(message, isError = false) {
+  const node = document.getElementById('bootstrap-feedback');
+  if (!node) return;
+  node.textContent = message || '';
+  node.className = isError ? 'error-text' : 'success-text';
+}
+
 async function api(path, options = {}) {
-  const res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...options });
+  const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+  const token = getAuthToken();
+  if (token) headers['x-auth-token'] = token;
+  const res = await fetch(path, { ...options, headers });
+  if (res.status === 401) {
+    setAuthToken('');
+    setAuthUi(false);
+  }
   if (!res.ok) {
     const error = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(error.error || res.statusText);
@@ -7,8 +54,38 @@ async function api(path, options = {}) {
   return res.json();
 }
 
+async function publicApiRequest(paths, options = {}) {
+  let lastError = null;
+  for (const path of paths) {
+    try {
+      const res = await fetch(path, {
+        ...options,
+        headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({ error: res.statusText }));
+        if (res.status === 404) {
+          lastError = new Error(payload.error || 'Not Found');
+          continue;
+        }
+        throw new Error(payload.error || res.statusText);
+      }
+      return res.json();
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error('Not Found');
+}
 function formatCurrency(value) {
   return Number(value).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
+}
+
+function parseAmountInput(value) {
+  const normalized = String(value ?? '').trim().replace(',', '.');
+  if (!normalized) return 0;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : NaN;
 }
 
 function createItemCard(title, body) {
@@ -23,6 +100,7 @@ let invoices = [];
 let invoicePage = 1;
 const invoicePageSize = 5;
 let invoiceFilter = 'all'; // 'all', 'paid', 'unpaid'
+let paymentRemainingDue = 0;
 
 async function loadClients() {
   const clients = await api('/api/clients');
@@ -40,11 +118,16 @@ async function loadProducts() {
   products = await api('/api/products');
   const list = document.getElementById('products-list');
   const options = document.getElementById('product-list');
+  const stockEntrySelect = document.getElementById('stock-entry-product');
   list.innerHTML = '';
   options.innerHTML = '';
+  if (stockEntrySelect) stockEntrySelect.innerHTML = '<option value="">Choisir un produit</option>';
   products.forEach(p => {
     list.appendChild(createItemCard(p.name, `Catégorie: ${p.category || '-'}<br>Achat: ${formatCurrency(p.purchase_price)}<br>Vente: ${formatCurrency(p.sell_price)}<br>Stock: ${p.stock || 0}`));
     options.innerHTML += `<option value="${p.name}" data-id="${p.id}" data-purchase="${p.purchase_price}" data-sell="${p.sell_price}" data-stock="${p.stock || 0}"></option>`;
+    if (stockEntrySelect) {
+      stockEntrySelect.innerHTML += `<option value="${p.id}">${p.name} (stock: ${p.stock || 0})</option>`;
+    }
   });
 }
 
@@ -75,6 +158,34 @@ async function loadStaff() {
   }
 }
 
+async function loadUsers() {
+  const users = await api('/api/users');
+  const list = document.getElementById('users-list');
+  if (!list) return;
+  list.innerHTML = '';
+
+  if (users.length === 0) {
+    list.innerHTML = '<p>Aucun user enregistre.</p>';
+    return;
+  }
+
+  users.forEach(user => {
+    const activeLabel = Number(user.is_active) === 1 ? 'Actif' : 'Inactif';
+    const row = document.createElement('div');
+    row.className = 'user-row';
+    row.innerHTML = `
+      <div class="user-row-main">
+        <strong>${user.display_name}</strong>
+        <span>@${user.username}</span>
+        <span>Role: ${user.role}</span>
+        <span>Statut: ${activeLabel}</span>
+      </div>
+      <button type="button" class="danger-btn" data-user-id="${user.id}">Supprimer</button>
+    `;
+    list.appendChild(row);
+  });
+}
+
 async function loadInvoices() {
   const data = await api('/api/invoices');
   invoices = data.invoices;
@@ -96,9 +207,19 @@ async function loadInvoices() {
 
   invoices.forEach(inv => {
     const title = `Facture #${inv.id} - ${inv.client_name || 'Aucun client'} - ${formatCurrency(inv.total)}`;
-    if (paymentInvoice) paymentInvoice.innerHTML += `<option value="${inv.id}">#${inv.id} - ${inv.client_name || 'Aucun client'} - ${formatCurrency(inv.total)}</option>`;
     if (select) select.innerHTML += `<option value="${inv.id}">${title}</option>`;
   });
+
+  if (paymentInvoice) {
+    const unpaidInvoices = invoices.filter(inv => !inv.isPaid);
+    if (unpaidInvoices.length === 0) {
+      paymentInvoice.innerHTML = '<option value="">Aucune facture impayee</option>';
+    } else {
+      unpaidInvoices.forEach(inv => {
+        paymentInvoice.innerHTML += `<option value="${inv.id}">#${inv.id} - ${inv.client_name || 'Aucun client'} - ${formatCurrency(inv.total)}</option>`;
+      });
+    }
+  }
 
   invoicePage = 1;
   renderInvoicePage();
@@ -176,6 +297,19 @@ function updateInvoiceTotal() {
   document.getElementById('invoice-total').value = formatCurrency(total);
 }
 
+function findBestProductMatch(query) {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return null;
+
+  const exact = products.find(p => p.name.toLowerCase() === normalized);
+  if (exact) return exact;
+
+  const startsWith = products.find(p => p.name.toLowerCase().startsWith(normalized));
+  if (startsWith) return startsWith;
+
+  return products.find(p => p.name.toLowerCase().includes(normalized)) || null;
+}
+
 function addInvoiceLine() {
   const container = document.createElement('div');
   container.className = 'line-row';
@@ -194,20 +328,42 @@ function addInvoiceLine() {
   const sellInput = container.querySelector('.sell-price');
   const stockInfo = container.querySelector('.stock-info');
 
-  productSearch.addEventListener('input', function () {
-    const query = this.value.trim().toLowerCase();
-    const match = products.find(p => p.name.toLowerCase() === query);
+  function applyProductMatch(match, forceLabel) {
     if (match) {
       productIdInput.value = match.id;
       purchaseInput.value = match.purchase_price;
       sellInput.value = match.sell_price;
       stockInfo.textContent = `Stock: ${match.stock || 0}`;
+      if (forceLabel) productSearch.value = match.name;
     } else {
       productIdInput.value = '';
       purchaseInput.value = '';
       sellInput.value = '';
       stockInfo.textContent = '';
     }
+  }
+
+  productSearch.addEventListener('input', function () {
+    const query = this.value.trim();
+    if (!query) {
+      applyProductMatch(null, false);
+      return;
+    }
+    const exact = products.find(p => p.name.toLowerCase() === query.toLowerCase());
+    applyProductMatch(exact || null, false);
+  });
+
+  productSearch.addEventListener('blur', function () {
+    const match = findBestProductMatch(this.value);
+    applyProductMatch(match, Boolean(match));
+  });
+
+  productSearch.addEventListener('keydown', function (event) {
+    if (event.key !== 'Enter') return;
+    const match = findBestProductMatch(this.value);
+    if (!match) return;
+    event.preventDefault();
+    applyProductMatch(match, true);
   });
 
   container.querySelector('.remove-line').addEventListener('click', () => {
@@ -239,6 +395,27 @@ document.getElementById('product-form').addEventListener('submit', async event =
   const data = Object.fromEntries(new FormData(event.target));
   await api('/api/products', { method: 'POST', body: JSON.stringify(data) });
   event.target.reset();
+  const stockFeedback = document.getElementById('stock-entry-feedback');
+  if (stockFeedback) stockFeedback.textContent = '';
+  loadProducts();
+});
+
+document.getElementById('stock-entry-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const form = event.target;
+  const data = Object.fromEntries(new FormData(form));
+  const feedback = document.getElementById('stock-entry-feedback');
+  const payload = {
+    product_id: Number(data.product_id),
+    quantity: Number(data.quantity)
+  };
+
+  const product = await api('/api/products/stock-entry', { method: 'POST', body: JSON.stringify(payload) });
+  if (feedback) {
+    feedback.textContent = `Entree enregistree: ${product.name} +${payload.quantity} (stock actuel: ${product.stock})`;
+  }
+
+  form.reset();
   loadProducts();
 });
 
@@ -248,6 +425,28 @@ document.getElementById('staff-form').addEventListener('submit', async event => 
   await api('/api/staff', { method: 'POST', body: JSON.stringify(data) });
   event.target.reset();
   loadStaff();
+});
+
+document.getElementById('user-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const form = event.target;
+  const data = Object.fromEntries(new FormData(form));
+  try {
+    await api('/api/users', { method: 'POST', body: JSON.stringify(data) });
+    form.reset();
+    await loadUsers();
+  } catch (error) {
+    alert(error.message || 'Impossible de creer le user.');
+  }
+});
+
+document.getElementById('users-list').addEventListener('click', async event => {
+  const button = event.target.closest('[data-user-id]');
+  if (!button) return;
+  const userId = button.dataset.userId;
+  if (!userId) return;
+  await api(`/api/users/${userId}`, { method: 'DELETE' });
+  await loadUsers();
 });
 
 document.getElementById('invoice-form').addEventListener('submit', async event => {
@@ -280,7 +479,16 @@ async function displayLastInvoice(invoiceId) {
   const data = await api(`/api/invoices?id=${invoiceId}`);
   const invoice = data.invoice;
   const lines = data.lines;
+  const html = buildInvoiceReceiptHtml(invoice, lines);
   
+  document.getElementById('last-invoice-details').innerHTML = html;
+  document.getElementById('last-invoice-section').style.display = 'block';
+  
+  // Stocker l'ID pour l'impression
+  document.getElementById('print-invoice-btn').dataset.invoiceId = invoiceId;
+}
+
+function buildInvoiceReceiptHtml(invoice, lines) {
   let html = `
     <div class="invoice-receipt">
       <h4>Facture #${invoice.id}</h4>
@@ -297,7 +505,7 @@ async function displayLastInvoice(invoiceId) {
           <th>Total</th>
         </tr>
   `;
-  
+
   lines.forEach(line => {
     html += `
       <tr>
@@ -308,24 +516,23 @@ async function displayLastInvoice(invoiceId) {
       </tr>
     `;
   });
-  
+
   html += `
       </table>
       <hr>
       <p><strong>Total:</strong> ${formatCurrency(invoice.total)}</p>
     </div>
   `;
-  
-  document.getElementById('last-invoice-details').innerHTML = html;
-  document.getElementById('last-invoice-section').style.display = 'block';
-  
-  // Stocker l'ID pour l'impression
-  document.getElementById('print-invoice-btn').dataset.invoiceId = invoiceId;
+
+  return html;
 }
 
-function printInvoice() {
+function printInvoiceHtml(content) {
   const printWindow = window.open('', '', 'height=400,width=600');
-  const content = document.getElementById('last-invoice-details').innerHTML;
+  if (!printWindow) {
+    alert("Impossible d'ouvrir la fenetre d'impression. Autorisez les popups pour ce site.");
+    return;
+  }
   printWindow.document.write(`
     <html>
       <head>
@@ -346,16 +553,50 @@ function printInvoice() {
     </html>
   `);
   printWindow.document.close();
+  printWindow.focus();
   printWindow.print();
 }
 
+function printInvoice() {
+  const content = document.getElementById('last-invoice-details').innerHTML;
+  printInvoiceHtml(content);
+}
+
 document.getElementById('add-line').addEventListener('click', addInvoiceLine);
+document.getElementById('print-invoice-btn').addEventListener('click', printInvoice);
 
 document.getElementById('payment-form').addEventListener('submit', async event => {
   event.preventDefault();
-  const data = Object.fromEntries(new FormData(event.target));
-  await api('/api/payments', { method: 'POST', body: JSON.stringify(data) });
-  event.target.reset();
+  const form = event.target;
+  const data = Object.fromEntries(new FormData(form));
+  const enteredAmount = parseAmountInput(data.amount);
+
+  if (!data.invoice_id) {
+    alert('Choisissez une facture.');
+    return;
+  }
+  if (!Number.isFinite(enteredAmount) || enteredAmount <= 0) {
+    alert('Somme encaissee invalide.');
+    return;
+  }
+
+  const amountToRecord = Math.min(enteredAmount, paymentRemainingDue);
+  if (amountToRecord <= 0) {
+    alert('Cette facture est deja reglee.');
+    return;
+  }
+
+  data.amount = amountToRecord.toFixed(2);
+  try {
+    await api('/api/payments', { method: 'POST', body: JSON.stringify(data) });
+  } catch (error) {
+    alert(error.message || 'Erreur lors du paiement.');
+    return;
+  }
+  form.reset();
+  paymentRemainingDue = 0;
+  document.getElementById('payment-due').value = '';
+  document.getElementById('payment-change').value = '';
   loadInvoices();
 });
 
@@ -375,19 +616,45 @@ document.getElementById('revenue-form').addEventListener('submit', async event =
 
 document.getElementById('payment-invoice').addEventListener('change', async event => {
   const invoiceId = event.target.value;
+  const dueInput = document.getElementById('payment-due');
+  const amountInput = document.getElementById('payment-amount');
+  const changeInput = document.getElementById('payment-change');
+
   if (!invoiceId) {
-    document.getElementById('payment-amount').value = '';
+    paymentRemainingDue = 0;
+    dueInput.value = '';
+    amountInput.value = '';
+    amountInput.removeAttribute('max');
+    changeInput.value = '';
     return;
   }
+
   const data = await api(`/api/invoices?id=${invoiceId}`);
   const invoice = data.invoice;
-  const payments = await api(`/api/payments?invoice_id=${invoiceId}`);
-  const paidAmount = payments.reduce((sum, p) => sum + Number(p.amount), 0);
-  const remaining = Number(invoice.total) - paidAmount;
-  document.getElementById('payment-amount').value = remaining > 0 ? remaining.toFixed(2) : '0.00';
+  const invoiceTotal = Number(invoice.total) || 0;
+
+  paymentRemainingDue = invoiceTotal > 0 ? invoiceTotal : 0;
+  dueInput.value = paymentRemainingDue.toFixed(2);
+  amountInput.value = '';
+  amountInput.removeAttribute('max');
+  changeInput.value = '0.00';
   document.getElementById('payment-date').value = invoice.date;
-  document.getElementById('payment-method').value = 'Espèces';
+  document.getElementById('payment-method').value = 'Especes';
 });
+
+if (!document.getElementById('payment-amount').dataset.changeBound) {
+  document.getElementById('payment-amount').addEventListener('input', event => {
+    const entered = parseAmountInput(event.target.value);
+    const changeInput = document.getElementById('payment-change');
+    if (!Number.isFinite(entered) || entered < 0) {
+      changeInput.value = '0.00';
+      return;
+    }
+    const change = entered - paymentRemainingDue;
+    changeInput.value = (change > 0 ? change : 0).toFixed(2);
+  });
+  document.getElementById('payment-amount').dataset.changeBound = '1';
+}
 
 async function showSummary(event) {
   event.preventDefault();
@@ -452,8 +719,17 @@ document.getElementById('invoice-select').addEventListener('change', async event
       <p>Total: ${formatCurrency(invoice.invoice.total)}</p>
       <p>Lignes:</p>
       <ul>${invoice.lines.map(line => `<li>${line.description} x${line.quantity} - ${formatCurrency(line.sell_price)} (total ${formatCurrency(line.line_total)})</li>`).join('')}</ul>
+      <button type="button" id="print-selected-invoice-btn">Imprimer cette facture</button>
     </div>
   `;
+
+  const printSelectedInvoiceBtn = document.getElementById('print-selected-invoice-btn');
+  if (printSelectedInvoiceBtn) {
+    printSelectedInvoiceBtn.addEventListener('click', () => {
+      const receiptHtml = buildInvoiceReceiptHtml(invoice.invoice, invoice.lines);
+      printInvoiceHtml(receiptHtml);
+    });
+  }
 });
 
 document.getElementById('summary-form').addEventListener('submit', showSummary);
@@ -466,8 +742,13 @@ function setTodayDate() {
   if (paymentDateInput) paymentDateInput.value = today;
 }
 
-async function initApp() {
-  addInvoiceLine();
+async function initAuthenticatedApp() {
+  if (!appBootstrapped) {
+    addInvoiceLine();
+    initInvoicePagination();
+    appBootstrapped = true;
+  }
+
   await loadClients();
   await loadProducts();
   try {
@@ -475,10 +756,98 @@ async function initApp() {
   } catch (error) {
     console.warn('Échec du chargement du personnel :', error);
   }
+  try {
+    await loadUsers();
+  } catch (error) {
+    console.warn('Echec du chargement des users :', error);
+  }
   await loadInvoices();
-  initInvoicePagination();
   setTodayDate();
   showPage('home');
 }
 
+async function refreshBootstrapStatus() {
+  const box = document.getElementById('bootstrap-admin-box');
+  try {
+    const status = await publicApiRequest(['/api/bootstrap-status', '/bootstrap-status']);
+    if (box) box.classList.toggle('hidden', status.hasUsers);
+  } catch (error) {
+    if (box) box.classList.remove('hidden');
+  }
+}
+
+document.getElementById('login-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const data = Object.fromEntries(new FormData(event.target));
+  try {
+    const loginResult = await publicApiRequest(['/api/login', '/login'], {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+    setAuthToken(loginResult.token);
+    setLoginFeedback('');
+    setAuthUi(true);
+    await initAuthenticatedApp();
+  } catch (error) {
+    if (String(error.message || '').toLowerCase().includes('not found')) {
+      setLoginFeedback('Route login introuvable. Redemarre le serveur backend.', true);
+      return;
+    }
+    setLoginFeedback(error.message || 'Connexion impossible', true);
+  }
+});
+
+document.getElementById('bootstrap-admin-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const payload = Object.fromEntries(new FormData(event.target));
+  payload.role = 'admin';
+  try {
+    const created = await publicApiRequest(['/api/bootstrap-admin', '/bootstrap-admin'], {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    setAuthToken(created.token);
+    setBootstrapFeedback('Premier admin cree avec succes.');
+    setAuthUi(true);
+    await initAuthenticatedApp();
+  } catch (error) {
+    if (String(error.message || '').toLowerCase().includes('not found')) {
+      setBootstrapFeedback('Route bootstrap introuvable. Redemarre le serveur backend.', true);
+      return;
+    }
+    setBootstrapFeedback(error.message || 'Creation impossible', true);
+  }
+});
+
+document.getElementById('logout-btn').addEventListener('click', async () => {
+  try {
+    await api('/api/logout', { method: 'POST' });
+  } catch (error) {
+    // Ignorer les erreurs de logout API, on force la deconnexion locale.
+  }
+  setAuthToken('');
+  setAuthUi(false);
+  setLoginFeedback('');
+  await refreshBootstrapStatus();
+});
+
+async function initApp() {
+  setAuthUi(false);
+  await refreshBootstrapStatus();
+  const token = getAuthToken();
+  if (!token) return;
+
+  try {
+    await api('/api/session');
+    setAuthUi(true);
+    await initAuthenticatedApp();
+  } catch (error) {
+    setAuthToken('');
+    setAuthUi(false);
+    setLoginFeedback('Session expiree, reconnectez-vous.', true);
+  }
+}
+
 initApp();
+
+

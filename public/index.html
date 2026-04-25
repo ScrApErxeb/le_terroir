@@ -9,29 +9,51 @@
 <body>
   <header>
     <h1>Le terroir enchanteur</h1>
-    <p>Clients, boissons, factures, paiements, dépenses et soldes journaliers.</p>
+    <p>Clients, boissons, factures, paiements, depenses et soldes journaliers.</p>
     <nav id="main-nav">
       <button type="button" data-page="home">Accueil</button>
       <button type="button" data-page="sales">Vente</button>
       <button type="button" data-page="management">Gestion</button>
       <button type="button" data-page="accounting">Compta</button>
     </nav>
+    <button type="button" id="logout-btn" class="hidden">Deconnexion</button>
   </header>
+
+  <section id="login-screen" class="panel">
+    <h2>Connexion</h2>
+    <form id="login-form">
+      <input name="username" placeholder="Identifiant" required />
+      <input name="password" type="password" placeholder="Mot de passe" required />
+      <button type="submit">Se connecter</button>
+    </form>
+    <div id="login-feedback"></div>
+
+    <div id="bootstrap-admin-box" class="hidden">
+      <h3>Premier administrateur</h3>
+      <form id="bootstrap-admin-form">
+        <input name="display_name" placeholder="Nom complet" required />
+        <input name="username" placeholder="Identifiant admin" required />
+        <input name="password" type="password" placeholder="Mot de passe" required />
+        <button type="submit">Creer le premier admin</button>
+      </form>
+      <div id="bootstrap-feedback"></div>
+    </div>
+  </section>
 
   <main>
     <section id="home-page" class="page panel">
       <h2>Bienvenue</h2>
-      <p>Utilisez les onglets pour gérer les ventes, les clients, les produits et la comptabilité.</p>
+      <p>Utilisez les onglets pour gerer les ventes, les clients, les produits et la comptabilite.</p>
       <div class="home-actions">
         <button type="button" data-page="sales">Nouvelle vente</button>
         <button type="button" data-page="management">Clients et produits</button>
-        <button type="button" data-page="accounting">Comptabilité</button>
+        <button type="button" data-page="accounting">Comptabilite</button>
       </div>
     </section>
 
     <section id="sales-page" class="page panel hidden">
       <h2>Vente</h2>
-      
+
       <div class="split-panel-sales">
         <div class="panel-left">
           <h3>Enregistrer une vente</h3>
@@ -53,23 +75,25 @@
           <form id="payment-form">
             <select name="invoice_id" id="payment-invoice" required></select>
             <input name="date" id="payment-date" type="date" required />
-            <input name="amount" id="payment-amount" placeholder="Montant" type="number" step="0.01" required />
-            <input name="method" id="payment-method" placeholder="Méthode" />
+            <input id="payment-due" placeholder="Reste a payer" type="number" step="0.01" readonly />
+            <input name="amount" id="payment-amount" placeholder="Somme encaissee" type="number" step="0.01" min="0" required />
+            <input id="payment-change" placeholder="Monnaie a rendre" type="number" step="0.01" readonly />
+            <input name="method" id="payment-method" placeholder="Methode" />
             <button type="submit">Enregistrer paiement</button>
           </form>
         </div>
       </div>
 
       <section class="panel" id="last-invoice-section" style="display: none;">
-        <h3>Dernière facture enregistrée</h3>
+        <h3>Derniere facture enregistree</h3>
         <div id="last-invoice-details"></div>
         <button type="button" id="print-invoice-btn">Imprimer la facture</button>
       </section>
 
       <section class="panel">
-        <h3>Factures enregistrées</h3>
+        <h3>Factures enregistrees</h3>
         <label>Choisir une facture :
-          <select id="invoice-select" name="selected_invoice"><option value="">Sélectionner une facture</option></select>
+          <select id="invoice-select" name="selected_invoice"><option value="">Selectionner une facture</option></select>
         </label>
         <div id="invoice-details"></div>
       </section>
@@ -78,8 +102,8 @@
         <h3>Liste des factures</h3>
         <div class="filter-buttons">
           <button type="button" class="filter-btn active" data-filter="all">Toutes</button>
-          <button type="button" class="filter-btn" data-filter="paid">Payées</button>
-          <button type="button" class="filter-btn" data-filter="unpaid">Impayées</button>
+          <button type="button" class="filter-btn" data-filter="paid">Payees</button>
+          <button type="button" class="filter-btn" data-filter="unpaid">Impayees</button>
         </div>
         <div id="invoice-list-container"></div>
         <div id="invoice-pagination" class="pagination-controls"></div>
@@ -93,7 +117,7 @@
           <h3>Clients</h3>
           <form id="client-form">
             <input name="name" placeholder="Nom du client" required />
-            <input name="phone" placeholder="Téléphone" />
+            <input name="phone" placeholder="Telephone" />
             <input name="email" placeholder="Email" type="email" />
             <input name="notes" placeholder="Notes" />
             <button type="submit">Ajouter client</button>
@@ -105,17 +129,26 @@
           <h3>Boissons / Produits</h3>
           <form id="product-form">
             <input name="name" placeholder="Nom du produit" required />
-            <input name="category" placeholder="Catégorie" />
+            <input name="category" placeholder="Categorie" />
             <input name="purchase_price" placeholder="Prix d'achat" type="number" step="0.01" required />
             <input name="sell_price" placeholder="Prix de vente" type="number" step="0.01" required />
             <input name="stock" placeholder="Stock initial" type="number" min="0" required />
             <button type="submit">Ajouter produit</button>
           </form>
+          <h4>Entree de produits</h4>
+          <form id="stock-entry-form">
+            <select name="product_id" id="stock-entry-product" required>
+              <option value="">Choisir un produit</option>
+            </select>
+            <input name="quantity" placeholder="Quantite entrante" type="number" min="1" step="1" required />
+            <button type="submit">Enregistrer entree</button>
+          </form>
+          <div id="stock-entry-feedback"></div>
           <div id="products-list"></div>
         </div>
       </div>
       <section class="panel">
-        <h3>Équipe</h3>
+        <h3>Equipe</h3>
         <form id="staff-form">
           <input name="name" placeholder="Nom du membre" required />
           <select name="role" required>
@@ -126,30 +159,50 @@
         </form>
         <div id="staff-list"></div>
       </section>
+
+      <section class="panel">
+        <h3>Utilisateurs</h3>
+        <form id="user-form">
+          <input name="display_name" placeholder="Nom complet" required />
+          <input name="username" placeholder="Identifiant (ex: admin1)" required />
+          <input name="password" type="password" placeholder="Mot de passe" required />
+          <select name="role" required>
+            <option value="admin">Admin</option>
+            <option value="caissier">Caissier</option>
+            <option value="manager">Manager</option>
+          </select>
+          <select name="is_active">
+            <option value="1">Actif</option>
+            <option value="0">Inactif</option>
+          </select>
+          <button type="submit">Ajouter user</button>
+        </form>
+        <div id="users-list"></div>
+      </section>
     </section>
 
     <section id="accounting-page" class="page panel hidden">
       <h2>Compta</h2>
       <div class="split-panel">
         <div class="panel">
-          <h3>Dépenses</h3>
+          <h3>Depenses</h3>
           <form id="expense-form">
             <input name="description" placeholder="Description" required />
             <input name="amount" placeholder="Montant" type="number" step="0.01" required />
             <input name="date" type="date" required />
-            <input name="category" placeholder="Catégorie" />
-            <button type="submit">Enregistrer dépense</button>
+            <input name="category" placeholder="Categorie" />
+            <button type="submit">Enregistrer depense</button>
           </form>
         </div>
 
         <div class="panel">
-          <h3>Entrées comptables</h3>
+          <h3>Entrees comptables</h3>
           <form id="revenue-form">
             <input name="description" placeholder="Description" required />
             <input name="amount" placeholder="Montant" type="number" step="0.01" required />
             <input name="date" type="date" required />
-            <input name="category" placeholder="Catégorie" />
-            <button type="submit">Enregistrer entrée</button>
+            <input name="category" placeholder="Categorie" />
+            <button type="submit">Enregistrer entree</button>
           </form>
         </div>
       </div>
@@ -158,7 +211,7 @@
         <h3>Solde par jour</h3>
         <form id="summary-form">
           <input name="date" type="date" required />
-          <button type="submit">Voir le résumé</button>
+          <button type="submit">Voir le resume</button>
         </form>
         <div id="summary-result"></div>
       </section>

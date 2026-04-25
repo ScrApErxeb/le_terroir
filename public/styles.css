@@ -42,6 +42,9 @@ main {
 .page.hidden {
   display: none;
 }
+.hidden {
+  display: none !important;
+}
 .split-panel {
   display: grid;
   gap: 12px;
@@ -69,6 +72,21 @@ main {
   border-radius: 8px;
   padding: 12px;
   box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+}
+#login-screen {
+  max-width: 520px;
+  margin: 12px auto;
+}
+#login-feedback,
+#bootstrap-feedback {
+  margin-top: 8px;
+  font-weight: 600;
+}
+.error-text {
+  color: #8c2424;
+}
+.success-text {
+  color: #1f4f2a;
 }
 .small-panel {
   max-width: 500px;
@@ -143,6 +161,12 @@ button:hover {
 #clients-list, #products-list, #invoices-list, #summary-result {
   margin-top: 8px;
 }
+
+#stock-entry-feedback {
+  margin-top: 8px;
+  color: #1f4f2a;
+  font-weight: 600;
+}
 .item-card {
   border: 1px solid #ddd;
   padding: 10px;
@@ -213,4 +237,31 @@ button:hover {
 .status-badge.unpaid {
   background: #f8d7da;
   color: #721c24;
+}
+
+.user-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid #ddd;
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  background: #fff;
+}
+
+.user-row-main {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.danger-btn {
+  background: #b53333;
+}
+
+.danger-btn:hover {
+  background: #8c2424;
 }
