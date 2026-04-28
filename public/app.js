@@ -78,7 +78,7 @@ async function publicApiRequest(paths, options = {}) {
   throw lastError || new Error('Not Found');
 }
 function formatCurrency(value) {
-  return Number(value).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
+  return Number(value).toLocaleString('fr-FR', { style: 'currency', currency: 'XOF' });
 }
 
 function parseAmountInput(value) {
