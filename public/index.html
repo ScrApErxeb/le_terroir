@@ -41,9 +41,43 @@
   </section>
 
   <main>
-    <section id="home-page" class="page panel">
-      <h2>Bienvenue</h2>
-      <p>Utilisez les onglets pour gerer les ventes, les clients, les produits et la comptabilite.</p>
+    <section id="home-page" class="page panel home-shell">
+      <div class="home-hero">
+        <div>
+          <p class="eyebrow">Tableau de bord</p>
+          <h2>Bienvenue dans Le terroir enchanteur</h2>
+          <p class="home-intro">Pilotez rapidement vos ventes, votre stock et votre comptabilite depuis un seul endroit.</p>
+        </div>
+        <div class="home-date-card">
+          <span>Aujourd'hui</span>
+          <strong id="home-today-label">-</strong>
+        </div>
+      </div>
+
+      <div class="home-metrics">
+        <article class="metric-card">
+          <p class="metric-label">Clients</p>
+          <p class="metric-value" id="home-metric-clients">0</p>
+        </article>
+        <article class="metric-card">
+          <p class="metric-label">Produits</p>
+          <p class="metric-value" id="home-metric-products">0</p>
+        </article>
+        <article class="metric-card">
+          <p class="metric-label">Factures</p>
+          <p class="metric-value" id="home-metric-invoices">0</p>
+        </article>
+        <article class="metric-card">
+          <p class="metric-label">Impayes</p>
+          <p class="metric-value" id="home-metric-unpaid">0</p>
+        </article>
+      </div>
+
+      <section class="home-highlight">
+        <h3>Situation du jour</h3>
+        <p id="home-kpi-note">Aucune donnee disponible pour le moment.</p>
+      </section>
+
       <div class="home-actions">
         <button type="button" data-page="sales">Nouvelle vente</button>
         <button type="button" data-page="management">Clients et produits</button>

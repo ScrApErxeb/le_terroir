@@ -97,6 +97,8 @@ function createItemCard(title, body) {
 
 let products = [];
 let invoices = [];
+let clientsCache = [];
+let staffCache = [];
 let invoicePage = 1;
 const invoicePageSize = 5;
 let invoiceFilter = 'all'; // 'all', 'paid', 'unpaid'
@@ -104,6 +106,7 @@ let paymentRemainingDue = 0;
 
 async function loadClients() {
   const clients = await api('/api/clients');
+  clientsCache = clients;
   const list = document.getElementById('clients-list');
   list.innerHTML = '';
   const clientSelect = document.getElementById('invoice-client');
@@ -112,6 +115,7 @@ async function loadClients() {
     list.appendChild(createItemCard(c.name, `Tel: ${c.phone || '-'}<br>Email: ${c.email || '-'}<br>${c.notes || ''}`));
     clientSelect.innerHTML += `<option value="${c.id}">${c.name}</option>`;
   });
+  updateHomeDashboard();
 }
 
 async function loadProducts() {
@@ -129,10 +133,12 @@ async function loadProducts() {
       stockEntrySelect.innerHTML += `<option value="${p.id}">${p.name} (stock: ${p.stock || 0})</option>`;
     }
   });
+  updateHomeDashboard();
 }
 
 async function loadStaff() {
   const staff = await api('/api/staff');
+  staffCache = staff;
   const staffList = document.getElementById('staff-list');
   const serverSelect = document.getElementById('server-select');
   staffList.innerHTML = '';
@@ -156,6 +162,7 @@ async function loadStaff() {
   if (firstSeller) {
     document.getElementById('sold-by').value = firstSeller;
   }
+  updateHomeDashboard();
 }
 
 async function loadUsers() {
@@ -223,6 +230,7 @@ async function loadInvoices() {
 
   invoicePage = 1;
   renderInvoicePage();
+  updateHomeDashboard();
 }
 
 function renderInvoicePage() {
@@ -740,6 +748,34 @@ function setTodayDate() {
   const paymentDateInput = document.getElementById('payment-date');
   if (invoiceDateInput) invoiceDateInput.value = today;
   if (paymentDateInput) paymentDateInput.value = today;
+}
+
+function updateHomeDashboard() {
+  const clientsNode = document.getElementById('home-metric-clients');
+  const productsNode = document.getElementById('home-metric-products');
+  const invoicesNode = document.getElementById('home-metric-invoices');
+  const unpaidNode = document.getElementById('home-metric-unpaid');
+  const todayLabel = document.getElementById('home-today-label');
+  const note = document.getElementById('home-kpi-note');
+  if (!clientsNode || !productsNode || !invoicesNode || !unpaidNode || !todayLabel || !note) return;
+
+  const unpaidInvoices = invoices.filter(inv => !inv.isPaid);
+  const unpaidTotal = unpaidInvoices.reduce((sum, inv) => sum + (Number(inv.total) || 0), 0);
+  const sellerCount = staffCache.filter(member => member.role === 'vendeur').length;
+  const serverCount = staffCache.filter(member => member.role === 'serveur').length;
+
+  clientsNode.textContent = String(clientsCache.length);
+  productsNode.textContent = String(products.length);
+  invoicesNode.textContent = String(invoices.length);
+  unpaidNode.textContent = String(unpaidInvoices.length);
+
+  todayLabel.textContent = new Date().toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric'
+  });
+  note.textContent = `${unpaidInvoices.length} facture(s) impayee(s) pour ${formatCurrency(unpaidTotal)}. Equipe: ${sellerCount} vendeur(s), ${serverCount} serveur(se)(s).`;
 }
 
 async function initAuthenticatedApp() {
